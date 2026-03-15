@@ -1,0 +1,64 @@
+# ===== Build Output =====
+target/
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+
+# ===== Maven =====
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# ===== IDE =====
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+nbproject/
+.nb-gradle/
+
+# ===== Application Config (contains secrets / env-specific settings) =====
+**/src/main/resources/application.yml
+**/src/main/resources/application.yaml
+**/src/main/resources/application.properties
+**/src/main/resources/application-*.yml
+**/src/main/resources/application-*.yaml
+**/src/main/resources/application-*.properties
+**/src/main/resources/bootstrap.yml
+**/src/main/resources/bootstrap.yaml
+**/src/main/resources/bootstrap-*.yml
+
+# ===== SQL / Data scripts (keep DDL, ignore data dumps) =====
+backend/sql/data/
+*.dump
+*.bak
+
+# ===== Logs =====
+logs/
+*.log
+*.log.*
+
+# ===== OS =====
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===== Node / Frontend (Vue3) =====
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+
+# ===== Tool-specific =====
+.42cog/
+.42plugin/
+.claude/
+.idea/
