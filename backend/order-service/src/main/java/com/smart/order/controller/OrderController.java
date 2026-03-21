@@ -66,6 +66,14 @@ public class OrderController {
         return Result.success();
     }
 
+    @Operation(summary = "变更订单状态（内部调用，供Feign使用）")
+    @PostMapping("/{id}/status")
+    public Result<Void> changeStatusPost(@PathVariable Long id,
+                                         @RequestBody Map<String, String> body) {
+        orderService.changeStatus(id, body.get("targetStatus"), body.get("remark"));
+        return Result.success();
+    }
+
     @Operation(summary = "获取待调度订单列表（供调度算法使用）")
     @GetMapping("/batch/pending")
     public Result<List<Order>> getPendingOrders() {

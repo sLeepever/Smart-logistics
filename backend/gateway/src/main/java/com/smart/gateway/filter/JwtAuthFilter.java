@@ -28,6 +28,7 @@ import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
 
 @Slf4j
@@ -117,7 +118,10 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
         ServerHttpResponse response = exchange.getResponse();
         response.setStatusCode(status);
         response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
-        Map<String, Object> body = Map.of("code", code, "message", message, "data", null);
+        Map<String, Object> body = new HashMap<>();
+        body.put("code", code);
+        body.put("message", message);
+        body.put("data", null);
         byte[] bytes;
         try {
             bytes = objectMapper.writeValueAsBytes(body);

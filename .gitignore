@@ -62,3 +62,6 @@ dist/
 .42plugin/
 .claude/
 .idea/
+
+# ===== Dev Notes =====
+DEV_NOTES.md
