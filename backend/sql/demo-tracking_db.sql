@@ -42,3 +42,7 @@ VALUES
 -- 当前位置（天河区港丽商业广场附近，进行第二站送货）
 (6, 4, 113.3350, 23.1450,  5.0,   75.0, NOW() - INTERVAL '1 hour'),
 (6, 4, 113.3360, 23.1448,  0.0,    0.0, NOW() - INTERVAL '30 minutes');
+
+SELECT setval('location_records_id_seq', (SELECT COALESCE(MAX(id), 1) FROM location_records));
+SELECT setval('order_chat_conversations_id_seq', (SELECT COALESCE(MAX(id), 1) FROM order_chat_conversations));
+SELECT setval('order_chat_messages_id_seq', (SELECT COALESCE(MAX(id), 1) FROM order_chat_messages));

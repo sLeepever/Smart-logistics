@@ -16,13 +16,13 @@ export interface LoginResponse {
 
 export const authApi = {
   login: (data: LoginRequest) =>
-    request.post<any, { data: LoginResponse }>('/auth/login', data),
+    request.post<unknown, { data: LoginResponse }>('/auth/login', data),
 
   logout: () =>
     request.post('/auth/logout'),
 
   refresh: (refreshToken: string) =>
-    request.post<any, { data: LoginResponse }>('/auth/refresh', { refreshToken }),
+    request.post<unknown, { data: LoginResponse }>('/auth/refresh', { refreshToken }),
 
   me: () =>
     request.get('/auth/me'),

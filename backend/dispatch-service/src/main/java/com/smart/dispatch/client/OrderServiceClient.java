@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 
 import java.util.List;
 import java.util.Map;
@@ -15,9 +16,10 @@ import java.util.Map;
 public interface OrderServiceClient {
 
     @GetMapping("/api/orders/batch/pending")
-    Result<List<OrderDTO>> getPendingOrders();
+    Result<List<OrderDTO>> getPendingOrders(@RequestHeader("X-User-Role") String userRole);
 
     @PostMapping("/api/orders/{id}/status")
     Result<Void> changeStatus(@PathVariable("id") Long id,
+                              @RequestHeader("X-User-Role") String userRole,
                               @RequestBody Map<String, String> body);
 }

@@ -2,6 +2,7 @@ package com.smart.dispatch.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.smart.common.contract.DispatchWorkflowContract;
 import com.smart.common.exception.BizException;
 import com.smart.common.result.ResultCode;
 import com.smart.dispatch.entity.Vehicle;
@@ -59,7 +60,7 @@ public class VehicleServiceImpl implements VehicleService {
     @Override
     public void delete(Long id) {
         Vehicle v = getById(id);
-        if ("on_route".equals(v.getStatus())) {
+        if (DispatchWorkflowContract.VEHICLE_ON_ROUTE.equals(v.getStatus())) {
             throw new BizException(ResultCode.BAD_REQUEST, "在途车辆不可删除");
         }
         vehicleMapper.deleteById(id);
@@ -68,6 +69,9 @@ public class VehicleServiceImpl implements VehicleService {
     @Override
     public void changeStatus(Long id, String status) {
         getById(id);
+        if (!DispatchWorkflowContract.VEHICLE_STATUSES.contains(status)) {
+            throw new BizException(ResultCode.BAD_REQUEST, "无效的车辆状态：" + status);
+        }
         Vehicle update = new Vehicle();
         update.setId(id);
         update.setStatus(status);

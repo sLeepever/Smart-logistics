@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS orders (
     weight           DECIMAL(8,2),
     volume           DECIMAL(8,2),
     status           VARCHAR(20)    NOT NULL DEFAULT 'pending'
-                       CHECK (status IN ('pending','dispatched','in_progress',
+                       CHECK (status IN ('pending_review','pending','dispatched','in_progress',
                                          'completed','cancelled','exception')),
     remark           TEXT,
     creator_id       BIGINT         NOT NULL,

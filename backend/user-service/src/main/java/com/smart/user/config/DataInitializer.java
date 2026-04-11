@@ -1,6 +1,7 @@
 package com.smart.user.config;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.smart.common.contract.UserRoleContract;
 import com.smart.user.entity.User;
 import com.smart.user.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
@@ -39,10 +40,10 @@ public class DataInitializer implements CommandLineRunner {
         String encodedPassword = passwordEncoder.encode("Demo@1234");
 
         List<User> demoUsers = List.of(
-                buildUser(1L, "admin",       encodedPassword, "管理员",   "13900000001", "admin"),
-                buildUser(2L, "dispatcher01",encodedPassword, "张调度",   "13900000002", "dispatcher"),
-                buildUser(3L, "driver001",   encodedPassword, "李司机",   "13900000003", "driver"),
-                buildUser(4L, "driver002",   encodedPassword, "王司机",   "13900000004", "driver")
+                buildUser(1L, "admin",       encodedPassword, "管理员",   "13900000001", UserRoleContract.ADMIN),
+                buildUser(2L, "dispatcher01",encodedPassword, "张调度",   "13900000002", UserRoleContract.DISPATCHER),
+                buildUser(3L, "driver001",   encodedPassword, "李司机",   "13900000003", UserRoleContract.DRIVER),
+                buildUser(4L, "driver002",   encodedPassword, "王司机",   "13900000004", UserRoleContract.DRIVER)
         );
 
         for (User user : demoUsers) {

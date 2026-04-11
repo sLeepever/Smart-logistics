@@ -3,6 +3,30 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { authApi, type LoginRequest } from '@/api/auth'
 
+export const roleLabels = {
+  admin: '管理员',
+  dispatcher: '调度员',
+  driver: '司机',
+  customer: '客户',
+} as const
+
+export const roleRouteMap = {
+  admin: '/dashboard',
+  dispatcher: '/dashboard',
+  driver: '/driver/tasks',
+  customer: '/customer/home',
+} as const
+
+export type AppRole = keyof typeof roleRouteMap
+
+export function isAppRole(role?: string): role is AppRole {
+  return Boolean(role && role in roleRouteMap)
+}
+
+export function resolveRoleHomeRoute(role?: string) {
+  return isAppRole(role) ? roleRouteMap[role] : '/login'
+}
+
 export const useAuthStore = defineStore('auth', () => {
   const router = useRouter()
 
@@ -34,12 +58,7 @@ export const useAuthStore = defineStore('auth', () => {
     sessionStorage.setItem('role', info.role)
 
     // 按角色跳转
-    const roleRouteMap: Record<string, string> = {
-      admin: '/dashboard',
-      dispatcher: '/dashboard',
-      driver: '/driver/tasks',
-    }
-    router.push(roleRouteMap[info.role] || '/dashboard')
+    router.push(resolveRoleHomeRoute(info.role))
   }
 
   function logout() {

@@ -49,10 +49,10 @@ CREATE INDEX IF NOT EXISTS idx_plans_created_at ON dispatch_plans(created_at);
 CREATE TABLE IF NOT EXISTS routes (
     id                  BIGSERIAL     PRIMARY KEY,
     plan_id             BIGINT        NOT NULL REFERENCES dispatch_plans(id),
-    vehicle_id          BIGINT        NOT NULL REFERENCES vehicles(id),
-    driver_id           BIGINT        NOT NULL,
-    status              VARCHAR(20)   NOT NULL DEFAULT 'assigned'
-                          CHECK (status IN ('assigned','accepted','in_progress','completed')),
+    vehicle_id          BIGINT        REFERENCES vehicles(id),
+    driver_id           BIGINT,
+    status              VARCHAR(20)   NOT NULL DEFAULT 'offered'
+                          CHECK (status IN ('offered','accepted','rejected','offer_exhausted','in_progress','completed')),
     estimated_distance  DECIMAL(10,2),
     estimated_duration  INT,
     actual_distance     DECIMAL(10,2),
@@ -66,6 +66,83 @@ CREATE INDEX IF NOT EXISTS idx_routes_plan_id    ON routes(plan_id);
 CREATE INDEX IF NOT EXISTS idx_routes_driver_id  ON routes(driver_id);
 CREATE INDEX IF NOT EXISTS idx_routes_vehicle_id ON routes(vehicle_id);
 CREATE INDEX IF NOT EXISTS idx_routes_status     ON routes(status);
+
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name = 'routes'
+    ) THEN
+        IF EXISTS (
+            SELECT 1
+            FROM pg_constraint
+            WHERE conname = 'routes_status_check'
+        ) THEN
+            ALTER TABLE routes
+                DROP CONSTRAINT routes_status_check;
+        END IF;
+
+        ALTER TABLE routes
+            ALTER COLUMN vehicle_id DROP NOT NULL;
+
+        ALTER TABLE routes
+            ALTER COLUMN driver_id DROP NOT NULL;
+
+        UPDATE routes
+           SET status = 'accepted'
+         WHERE status = 'assigned';
+
+        ALTER TABLE routes
+            ADD CONSTRAINT routes_status_check
+            CHECK (status IN ('offered','accepted','rejected','offer_exhausted','in_progress','completed'));
+    END IF;
+END $$;
+
+-- 路线候选司机表：一条 route 可对应多组 (vehicle_id, driver_id) 候选，用于后续抢单/拒单流程
+CREATE TABLE IF NOT EXISTS route_offer_candidates (
+    id                BIGSERIAL     PRIMARY KEY,
+    route_id          BIGINT        NOT NULL REFERENCES routes(id),
+    vehicle_id        BIGINT        NOT NULL REFERENCES vehicles(id),
+    driver_id         BIGINT        NOT NULL,
+    candidate_status  VARCHAR(20)   NOT NULL DEFAULT 'offered'
+                        CHECK (candidate_status IN ('queued','offered','accepted','rejected','offer_exhausted')),
+    offered_at        TIMESTAMP,
+    responded_at      TIMESTAMP,
+    display_order     INT           NOT NULL DEFAULT 0,
+    created_at        TIMESTAMP     NOT NULL DEFAULT NOW(),
+    updated_at        TIMESTAMP     NOT NULL DEFAULT NOW(),
+    UNIQUE (route_id, vehicle_id, driver_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_route_offer_candidates_route_id ON route_offer_candidates(route_id);
+CREATE INDEX IF NOT EXISTS idx_route_offer_candidates_driver_id ON route_offer_candidates(driver_id);
+CREATE INDEX IF NOT EXISTS idx_route_offer_candidates_vehicle_id ON route_offer_candidates(vehicle_id);
+CREATE INDEX IF NOT EXISTS idx_route_offer_candidates_status ON route_offer_candidates(candidate_status);
+
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name = 'route_offer_candidates'
+    ) THEN
+        IF EXISTS (
+            SELECT 1
+            FROM pg_constraint
+            WHERE conname = 'route_offer_candidates_candidate_status_check'
+        ) THEN
+            ALTER TABLE route_offer_candidates
+                DROP CONSTRAINT route_offer_candidates_candidate_status_check;
+        END IF;
+
+        ALTER TABLE route_offer_candidates
+            ADD CONSTRAINT route_offer_candidates_candidate_status_check
+            CHECK (candidate_status IN ('queued','offered','accepted','rejected','offer_exhausted'));
+    END IF;
+END $$;
 
 -- 路线途经点表
 CREATE TABLE IF NOT EXISTS route_stops (

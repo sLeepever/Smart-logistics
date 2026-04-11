@@ -1,28 +1,31 @@
 <template>
-  <el-card>
-    <template #header>
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <span style="font-weight:600">车辆管理</span>
-        <el-button type="primary" :icon="Plus" @click="openCreate">新增车辆</el-button>
-      </div>
-    </template>
+  <div class="vehicle-view app-page">
+    <el-card class="vehicle-view__panel app-console-panel" shadow="never">
+      <template #header>
+        <div class="vehicle-view__header">
+          <div>
+            <span class="vehicle-view__title">车辆工作台</span>
+            <p class="vehicle-view__subtitle">查看车辆状态、编辑运力参数、切换维修状态和绑定司机。</p>
+          </div>
+          <el-button type="primary" :icon="Plus" @click="openCreate">新增车辆</el-button>
+        </div>
+      </template>
 
-    <!-- 筛选 -->
-    <el-form inline style="margin-bottom:12px">
-      <el-form-item label="状态">
-        <el-select v-model="filterStatus" placeholder="全部" clearable style="width:120px" @change="load">
-          <el-option v-for="s in statusOptions" :key="s.value" :label="s.label" :value="s.value" />
-        </el-select>
-      </el-form-item>
-    </el-form>
+      <el-form inline class="vehicle-view__toolbar app-toolbar-panel">
+        <el-form-item label="状态">
+          <el-select v-model="filterStatus" placeholder="全部" clearable style="width: 140px" @change="load">
+            <el-option v-for="s in statusOptions" :key="s.value" :label="s.label" :value="s.value" />
+          </el-select>
+        </el-form-item>
+      </el-form>
 
-    <el-table :data="tableData" v-loading="loading" border stripe>
+      <el-table :data="tableData" v-loading="loading" border stripe class="vehicle-view__table">
       <el-table-column prop="plateNo" label="车牌号" width="120" />
       <el-table-column prop="vehicleType" label="车型" width="100" />
       <el-table-column prop="maxWeight" label="载重(kg)" width="100" align="right" />
       <el-table-column prop="maxVolume" label="容积(m³)" width="100" align="right" />
-      <el-table-column prop="driverId" label="司机ID" width="90" align="center">
-        <template #default="{ row }">{{ row.driverId ?? '未分配' }}</template>
+      <el-table-column prop="driverId" label="绑定司机ID" width="110" align="center">
+        <template #default="{ row }">{{ row.driverId ?? '未绑定' }}</template>
       </el-table-column>
       <el-table-column label="状态" width="100" align="center">
         <template #default="{ row }">
@@ -55,18 +58,17 @@
       </el-table-column>
     </el-table>
 
-    <el-pagination
-      style="margin-top:16px;justify-content:flex-end"
+      <el-pagination
+      class="vehicle-view__pagination"
       v-model:current-page="page"
       v-model:page-size="size"
       :total="total"
       layout="total, prev, pager, next"
       @change="load"
     />
-  </el-card>
+    </el-card>
 
-  <!-- 新建/编辑弹窗 -->
-  <el-dialog v-model="dialogVisible" :title="editingId ? '编辑车辆' : '新增车辆'" width="480px">
+    <el-dialog v-model="dialogVisible" :title="editingId ? '编辑车辆' : '新增车辆'" width="520px" class="vehicle-view__dialog">
     <el-form ref="formRef" :model="form" :rules="rules" label-width="80px">
       <el-form-item label="车牌号" prop="plateNo">
         <el-input v-model="form.plateNo" />
@@ -84,7 +86,7 @@
       <el-form-item label="容积(m³)" prop="maxVolume">
         <el-input-number v-model="form.maxVolume" :min="1" :precision="2" style="width:100%" />
       </el-form-item>
-      <el-form-item label="司机ID">
+      <el-form-item label="绑定司机ID">
         <el-input-number v-model="form.driverId" :min="1" :precision="0" style="width:100%" />
       </el-form-item>
     </el-form>
@@ -92,7 +94,8 @@
       <el-button @click="dialogVisible = false">取消</el-button>
       <el-button type="primary" :loading="submitting" @click="handleSubmit">确定</el-button>
     </template>
-  </el-dialog>
+    </el-dialog>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -180,3 +183,49 @@ async function handleSubmit() {
   }
 }
 </script>
+
+<style scoped>
+.vehicle-view__panel {
+  position: relative;
+}
+
+.vehicle-view__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--app-space-4);
+}
+
+.vehicle-view__title {
+  color: var(--app-text-strong);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.vehicle-view__subtitle {
+  margin-top: 6px;
+  color: var(--app-text-secondary);
+  line-height: 1.7;
+}
+
+.vehicle-view__toolbar {
+  margin-bottom: var(--app-space-4);
+}
+
+.vehicle-view__table {
+  width: 100%;
+}
+
+.vehicle-view__pagination {
+  justify-content: flex-end;
+  margin-top: var(--app-space-4);
+}
+
+@media (max-width: 768px) {
+  .vehicle-view__header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+</style>

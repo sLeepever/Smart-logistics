@@ -95,15 +95,23 @@ public class AuthServiceImpl implements AuthService {
         }
 
         Long userId = jwtUtil.getUserId(claims);
-        String role = jwtUtil.getRole(claims);
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new BizException(ResultCode.UNAUTHORIZED, "refreshToken 对应用户不存在");
+        }
+        if (user.getStatus() != 1) {
+            throw new BizException(ResultCode.FORBIDDEN, "账号已被禁用，请联系管理员");
+        }
 
-        String newAccessToken = jwtUtil.generateAccessToken(userId, role);
+        String newAccessToken = jwtUtil.generateAccessToken(userId, user.getRole());
 
         return LoginResponse.builder()
                 .accessToken(newAccessToken)
                 .refreshToken(refreshToken)
                 .userId(userId)
-                .role(role)
+                .username(user.getUsername())
+                .realName(user.getRealName())
+                .role(user.getRole())
                 .build();
     }
 }

@@ -15,7 +15,7 @@ import java.time.LocalDateTime;
 @TableName(value = "dispatch_plans", autoResultMap = true)
 public class DispatchPlan extends BaseEntity {
     private String planNo;
-    /** draft / confirmed / executing / completed */
+    /** draft / confirmed / executing / completed / cancelled */
     private String status;
     private Integer totalOrders;
     private Integer totalRoutes;

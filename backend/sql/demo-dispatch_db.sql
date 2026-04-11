@@ -77,6 +77,11 @@ VALUES
 
 SELECT setval('routes_id_seq', (SELECT MAX(id) FROM routes));
 
+INSERT INTO route_offer_candidates (route_id, vehicle_id, driver_id, candidate_status, offered_at, responded_at, display_order)
+VALUES
+(5, 6, 3, 'accepted', NOW() - INTERVAL '4 hours 10 minutes', NOW() - INTERVAL '4 hours 5 minutes', 1),
+(6, 7, 4, 'accepted', NOW() - INTERVAL '3 hours 40 minutes', NOW() - INTERVAL '3 hours 35 minutes', 1);
+
 -- --------------------------------------------------------
 -- 路线途经点（plan_id=3 执行中路线，冗余存储地址坐标）
 -- 路线5：订单 16,17,18,19 的配送点
@@ -103,3 +108,7 @@ VALUES
 (6, 22, 6, 'delivery', '广州市天河区天河北路363号港丽商业广场',            113.3350, 23.1450),
 (6, 20, 7, 'delivery', '广州市黄埔区南岗镇广州大道南3278号',               113.4200, 23.1100),
 (6, 21, 8, 'delivery', '广州市番禺区大石街迎宾路128号',                    113.3500, 22.9600);
+
+SELECT setval('route_stops_id_seq', (SELECT COALESCE(MAX(id), 1) FROM route_stops));
+
+SELECT setval('route_offer_candidates_id_seq', (SELECT MAX(id) FROM route_offer_candidates));

@@ -23,6 +23,11 @@ export interface Order {
   updatedAt: string
 }
 
+export interface OrderReviewRequest {
+  action: string
+  remark?: string
+}
+
 export interface OrderQuery {
   page: number
   size: number
@@ -42,16 +47,32 @@ export interface PageResult<T> {
 
 export const orderApi = {
   list(params: OrderQuery) {
-    return request.get<any, { data: PageResult<Order> }>('/orders', { params })
+    return request.get<unknown, { data: PageResult<Order> }>('/orders', { params })
+  },
+  listMine(params: OrderQuery) {
+    return request.get<unknown, { data: PageResult<Order> }>('/orders/mine', { params })
+  },
+  getById(id: number) {
+    return request.get<unknown, { data: Order }>(`/orders/${id}`)
   },
   create(data: Partial<Order>) {
-    return request.post<any, { data: Order }>('/orders', data)
+    return request.post<unknown, { data: Order }>('/orders', data)
   },
   update(id: number, data: Partial<Order>) {
-    return request.put<any, { data: Order }>(`/orders/${id}`, data)
+    return request.put<unknown, { data: Order }>(`/orders/${id}`, data)
   },
   delete(id: number) {
     return request.delete(`/orders/${id}`)
+  },
+  cancel(id: number) {
+    return request.patch(`/orders/${id}/cancel`)
+  },
+  cancelPendingReview(id: number) {
+    return request.patch(`/orders/${id}/cancel`)
+  },
+  review(id: number, action: string, remark?: string) {
+    const data: OrderReviewRequest = { action, remark }
+    return request.patch(`/orders/${id}/review`, data)
   },
   changeStatus(id: number, status: string, remark?: string) {
     return request.patch(`/orders/${id}/status`, { targetStatus: status, remark })

@@ -13,7 +13,7 @@ public class User extends BaseEntity {
     private String password;
     private String realName;
     private String phone;
-    /** admin / dispatcher / driver */
+    /** admin / dispatcher / driver / customer */
     private String role;
     /** 1: 启用, 0: 禁用 */
     private Integer status;

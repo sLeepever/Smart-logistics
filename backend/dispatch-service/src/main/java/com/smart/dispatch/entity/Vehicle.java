@@ -15,6 +15,7 @@ public class Vehicle extends BaseEntity {
     private String vehicleType;
     private BigDecimal maxWeight;
     private BigDecimal maxVolume;
+    /** 车辆可预绑定司机；路线接受前 routes.driver_id 仍可为空 */
     private Long driverId;
     /** idle / on_route / maintenance */
     private String status;

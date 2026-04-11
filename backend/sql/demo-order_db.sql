@@ -11,6 +11,14 @@ INSERT INTO orders (id, order_no, sender_name, sender_phone, sender_address, sen
                     receiver_name, receiver_phone, receiver_address, receiver_lng, receiver_lat,
                     goods_name, weight, volume, status, creator_id, created_at)
 VALUES
+-- pending_review 订单（待审核，2条）
+(31, 'ORD20260314011', '广工仓储中心', '02039322000', '广东工业大学大学城校区仓库', 113.3960, 23.0452,
+ '客户甲联系人', '13800138131', '广州市天河区科韵路16号', 113.3730, 23.1330,
+ '样品文件', 5.00, 0.03, 'pending_review', 2, NOW() - INTERVAL '20 minutes'),
+(32, 'ORD20260314012', '广工仓储中心', '02039322000', '广东工业大学大学城校区仓库', 113.3960, 23.0452,
+ '客户乙联系人', '13800138132', '广州市番禺区大学城中环东路18号', 113.4005, 23.0570,
+ '办公耗材', 12.00, 0.08, 'pending_review', 2, NOW() - INTERVAL '10 minutes'),
+
 -- pending 订单（待调度，10条）
 (1,  'ORD20260314001', '广工仓储中心', '02039322000', '广东工业大学大学城校区仓库', 113.3960, 23.0452,
  '陈志远', '13800138001', '广州市天河区天河路385号太古汇', 113.3286, 23.1317,

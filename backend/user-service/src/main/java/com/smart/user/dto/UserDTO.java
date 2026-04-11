@@ -13,4 +13,6 @@ public class UserDTO {
     private String role;
     private Integer status;
     private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+    private CustomerProfileDTO customerProfile;
 }

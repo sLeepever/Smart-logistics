@@ -1,5 +1,6 @@
 package com.smart.user.dto;
 
+import com.smart.common.contract.UserRoleContract;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import lombok.Data;
@@ -8,12 +9,16 @@ import lombok.Data;
 public class CreateUserRequest {
     @NotBlank(message = "用户名不能为空")
     private String username;
-    @NotBlank(message = "密码不能为空")
     private String password;
     private String realName;
     @Pattern(regexp = "^1[3-9]\\d{9}$", message = "手机号格式不正确")
     private String phone;
     @NotBlank(message = "角色不能为空")
-    @Pattern(regexp = "^(admin|dispatcher|driver)$", message = "角色只能是 admin/dispatcher/driver")
+    @Pattern(regexp = UserRoleContract.VALIDATION_REGEX, message = "角色只能是 admin/dispatcher/driver/customer")
     private String role;
+    private Integer status;
+    private String contactName;
+    private String companyName;
+    private String defaultAddress;
+    private String remark;
 }

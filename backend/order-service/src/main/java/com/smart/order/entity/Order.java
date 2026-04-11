@@ -25,7 +25,7 @@ public class Order extends BaseEntity {
     private String goodsName;
     private BigDecimal weight;
     private BigDecimal volume;
-    /** pending / dispatched / in_progress / completed / cancelled */
+    /** pending_review / pending / dispatched / in_progress / completed / cancelled / exception */
     private String status;
     private String remark;
     private Long creatorId;

@@ -13,9 +13,11 @@ import java.time.LocalDateTime;
 @TableName("routes")
 public class Route extends BaseEntity {
     private Long planId;
+    /** 可为空：路线在 offer 阶段尚未被最终认领 */
     private Long vehicleId;
+    /** 可为空：路线在 offer 阶段尚未被最终认领 */
     private Long driverId;
-    /** assigned / accepted / in_progress / completed */
+    /** offered / accepted / rejected / offer_exhausted / in_progress / completed */
     private String status;
     private BigDecimal estimatedDistance;
     private Integer estimatedDuration;
