@@ -322,6 +322,7 @@ const form = reactive({
   remark: '',
 })
 
+const formRules = {
   receiverName:    [{ required: true, message: '请输入收货人姓名', trigger: 'blur' }],
   receiverPhone:   [{ required: true, message: '请输入联系电话',   trigger: 'blur' }],
   receiverAddress: [{ required: true, message: '请输入收货地址',   trigger: 'blur' }],
