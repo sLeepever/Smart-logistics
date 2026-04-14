@@ -103,7 +103,18 @@
         class="customer-home__table"
         data-testid="customer-order-table"
       >
-        <el-table-column prop="orderNo" label="订单号" min-width="170" />
+        <el-table-column prop="orderNo" label="订单号" min-width="170">
+          <template #default="{ row }">
+            <el-badge
+              :value="chatUnread.getCount(row.id)"
+              :max="99"
+              :hidden="chatUnread.getCount(row.id) === 0"
+              class="customer-home__chat-badge"
+            >
+              {{ row.orderNo }}
+            </el-badge>
+          </template>
+        </el-table-column>
         <el-table-column prop="receiverName" label="收货人" width="110" />
         <el-table-column prop="receiverPhone" label="联系电话" width="140" />
         <el-table-column prop="receiverAddress" label="收货地址" min-width="220" show-overflow-tooltip />
@@ -192,7 +203,12 @@
       >
         <div class="customer-home__form-grid">
           <el-form-item label="寄件人" prop="senderName">
-            <el-input v-model="form.senderName" />
+            <div style="display:flex;gap:8px;width:100%">
+              <el-input v-model="form.senderName" style="flex:1" />
+              <el-button size="small" style="align-self:center;white-space:nowrap" @click="fillSenderFromAccount">
+                填入我的信息
+              </el-button>
+            </div>
           </el-form-item>
           <el-form-item label="寄件电话" prop="senderPhone">
             <el-input v-model="form.senderPhone" />
@@ -293,6 +309,13 @@
               {{ detailOrder.weight }} kg / {{ detailOrder.volume || 0 }} m3
             </el-descriptions-item>
             <el-descriptions-item label="备注" :span="2">{{ detailOrder.remark || '--' }}</el-descriptions-item>
+            <el-descriptions-item label="创建人">
+              <span v-if="detailCreator">
+                {{ detailCreator.realName || detailCreator.username }}
+                <el-text type="info" size="small" style="margin-left:6px">{{ detailCreator.phone || '' }}</el-text>
+              </span>
+              <span v-else>--</span>
+            </el-descriptions-item>
             <el-descriptions-item label="创建时间">{{ formatTime(detailOrder.createdAt) }}</el-descriptions-item>
             <el-descriptions-item label="更新时间">{{ formatTime(detailOrder.updatedAt) }}</el-descriptions-item>
           </el-descriptions>
@@ -336,12 +359,15 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import OrderChatPanel from '@/components/OrderChatPanel.vue'
 import { orderApi, type Order } from '@/api/order'
+import { userApi, type UserBrief } from '@/api/user'
 import { useAuthStore } from '@/stores/auth'
 import { useGeocode } from '@/composables/useGeocode'
+import { useChatUnreadStore } from '@/stores/chatUnread'
 
 const { geocode, geocoding } = useGeocode()
 
 const authStore = useAuthStore()
+const chatUnread = useChatUnreadStore()
 
 const statusOptions = [
   { value: 'pending_review', label: '待审核' },
@@ -386,6 +412,7 @@ const formRef = ref<FormInstance>()
 const detailVisible = ref(false)
 const detailLoading = ref(false)
 const detailOrder = ref<Order | null>(null)
+const detailCreator = ref<UserBrief | null>(null)
 
 const form = reactive({
   senderName: '',
@@ -404,10 +431,16 @@ const form = reactive({
 
 const formRules: FormRules = {
   senderName: [{ required: true, message: '请输入寄件人姓名', trigger: 'blur' }],
-  senderPhone: [{ required: true, message: '请输入寄件电话', trigger: 'blur' }],
+  senderPhone: [
+    { required: true, message: '请输入寄件电话', trigger: 'blur' },
+    { pattern: /^\d{10}$/, message: '电话号码必须为10位数字', trigger: 'blur' },
+  ],
   senderAddress: [{ required: true, message: '请输入寄件地址', trigger: 'blur' }],
   receiverName: [{ required: true, message: '请输入收货人姓名', trigger: 'blur' }],
-  receiverPhone: [{ required: true, message: '请输入收货电话', trigger: 'blur' }],
+  receiverPhone: [
+    { required: true, message: '请输入收货电话', trigger: 'blur' },
+    { pattern: /^\d{10}$/, message: '电话号码必须为10位数字', trigger: 'blur' },
+  ],
   receiverAddress: [{ required: true, message: '请输入收货地址', trigger: 'blur' }],
   receiverLng: [{ required: true, type: 'number' as const, min: 0.000001, message: '请输入有效收货经度', trigger: 'blur' }],
   receiverLat: [{ required: true, type: 'number' as const, min: 0.000001, message: '请输入有效收货纬度', trigger: 'blur' }],
@@ -457,6 +490,11 @@ function applyFormDefaults() {
   })
 }
 
+function fillSenderFromAccount() {
+  form.senderName = authStore.userInfo.realName || authStore.userInfo.username
+  form.senderPhone = authStore.userInfo.phone || ''
+}
+
 function fillForm(order: Order) {
   Object.assign(form, {
     senderName: order.senderName || displayName.value,
@@ -485,6 +523,7 @@ async function loadData() {
     })
     tableData.value = res.data.records
     total.value = res.data.total
+    chatUnread.fetchCounts(tableData.value.map(o => o.id))
   } finally {
     loading.value = false
   }
@@ -512,8 +551,17 @@ async function openDetail(order: Order) {
   detailVisible.value = true
   detailLoading.value = true
   detailOrder.value = null
+  detailCreator.value = null
   try {
     detailOrder.value = await fetchOrder(order.id)
+    if (detailOrder.value?.creatorId) {
+      try {
+        const res = await userApi.getBrief(detailOrder.value.creatorId)
+        detailCreator.value = res.data
+      } catch {
+        // 静默处理
+      }
+    }
   } finally {
     detailLoading.value = false
   }
@@ -647,6 +695,14 @@ onMounted(loadData)
 .customer-home {
   display: grid;
   gap: var(--app-space-4);
+}
+
+.customer-home__chat-badge :deep(.el-badge__content) {
+  font-size: 10px;
+  height: 16px;
+  line-height: 16px;
+  min-width: 16px;
+  padding: 0 4px;
 }
 
 .customer-home__card {

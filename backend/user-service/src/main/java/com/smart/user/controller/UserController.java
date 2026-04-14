@@ -6,6 +6,7 @@ import com.smart.common.exception.BizException;
 import com.smart.common.result.ResultCode;
 import com.smart.common.result.Result;
 import com.smart.user.dto.CreateUserRequest;
+import com.smart.user.dto.UserBriefDTO;
 import com.smart.user.dto.UserDTO;
 import com.smart.user.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -37,13 +38,21 @@ public class UserController {
         return Result.success(userService.listUsers(operatorUserId, operatorRole, page, size, role, keyword));
     }
 
-    @Operation(summary = "查询单个用户")
+    @Operation(summary = "查询单个用户（仅管理员）")
     @GetMapping("/{id}")
     public Result<UserDTO> getUser(@RequestHeader("X-User-Id") Long operatorUserId,
                                    @RequestHeader("X-User-Role") String operatorRole,
                                    @PathVariable Long id) {
         assertAdmin(operatorRole);
         return Result.success(userService.getUserById(operatorUserId, operatorRole, id));
+    }
+
+    @Operation(summary = "查询用户简要信息（任意登录角色可用，用于展示创建人信息）")
+    @GetMapping("/{id}/brief")
+    public Result<UserBriefDTO> getUserBrief(@RequestHeader("X-User-Id") Long requesterId,
+                                             @RequestHeader("X-User-Role") String requesterRole,
+                                             @PathVariable Long id) {
+        return Result.success(userService.getUserBrief(id));
     }
 
     @Operation(summary = "创建用户")

@@ -6,6 +6,7 @@ import com.smart.common.contract.UserRoleContract;
 import com.smart.common.exception.BizException;
 import com.smart.common.result.ResultCode;
 import com.smart.user.dto.CustomerProfileDTO;
+import com.smart.user.dto.UserBriefDTO;
 import com.smart.user.dto.CreateUserRequest;
 import com.smart.user.dto.UserDTO;
 import com.smart.user.entity.CustomerProfile;
@@ -123,6 +124,20 @@ public class UserServiceImpl implements UserService {
         }
         user.setPassword(passwordEncoder.encode(newPassword.trim()));
         userMapper.updateById(user);
+    }
+
+    @Override
+    public UserBriefDTO getUserBrief(Long id) {
+        User user = userMapper.selectById(id);
+        if (user == null) {
+            throw new BizException(ResultCode.USER_NOT_FOUND);
+        }
+        UserBriefDTO dto = new UserBriefDTO();
+        dto.setId(user.getId());
+        dto.setUsername(user.getUsername());
+        dto.setRealName(user.getRealName());
+        dto.setPhone(user.getPhone());
+        return dto;
     }
 
     private void assertAdmin(Long operatorUserId, String operatorRole) {

@@ -40,7 +40,18 @@
 
     <!-- 表格 -->
     <el-table :data="tableData" v-loading="loading" border stripe class="orders-view__table">
-      <el-table-column prop="orderNo" label="订单号" width="160" />
+      <el-table-column prop="orderNo" label="订单号" width="160">
+        <template #default="{ row }">
+          <el-badge
+            :value="chatUnread.getCount(row.id)"
+            :max="99"
+            :hidden="chatUnread.getCount(row.id) === 0"
+            class="orders-view__chat-badge"
+          >
+            {{ row.orderNo }}
+          </el-badge>
+        </template>
+      </el-table-column>
       <el-table-column prop="receiverName" label="收货人" width="90" />
       <el-table-column prop="receiverPhone" label="联系电话" width="120" />
       <el-table-column prop="receiverAddress" label="收货地址" min-width="160" show-overflow-tooltip />
@@ -95,7 +106,7 @@
     />
     </el-card>
 
-  <!-- 新建/编辑订单弹窗 -->
+    <!-- 新建/编辑订单弹窗 -->
     <el-dialog
       v-model="formVisible"
       :title="editingId ? '编辑订单' : '新建订单'"
@@ -121,6 +132,36 @@
           <el-input-number v-model="form.receiverLng" :precision="6" :step="0.001" style="flex:1" placeholder="经度" />
           <el-input-number v-model="form.receiverLat" :precision="6" :step="0.001" style="flex:1" placeholder="纬度" />
         </div>
+      </el-form-item>
+      <el-form-item label="货物名称" prop="goodsName">
+        <el-input v-model="form.goodsName" />
+      </el-form-item>
+      <el-form-item label="重量(kg)" prop="weight">
+        <el-input-number v-model="form.weight" :min="0.1" :precision="2" style="width:100%" />
+      </el-form-item>
+      <el-form-item label="体积(m³)">
+        <el-input-number v-model="form.volume" :min="0" :precision="3" style="width:100%" />
+      </el-form-item>
+      <!-- 创建人联系信息（选填） -->
+      <el-divider content-position="left" style="margin:8px 0 4px">创建人联系信息（选填）</el-divider>
+      <el-form-item label="创建人姓名">
+        <div style="display:flex;gap:8px;width:100%">
+          <el-input
+            v-model="form.creatorName"
+            :disabled="!creatorInfoEnabled"
+            :placeholder="creatorInfoEnabled ? '请输入姓名' : '默认使用当前账号信息'"
+            style="flex:1"
+          />
+          <el-button v-if="!creatorInfoEnabled" @click="enableCreatorInfo">填入我的信息</el-button>
+          <el-button v-else type="info" plain @click="clearCreatorInfo">清除</el-button>
+        </div>
+      </el-form-item>
+      <el-form-item label="创建人电话">
+        <el-input
+          v-model="form.creatorPhone"
+          :disabled="!creatorInfoEnabled"
+          :placeholder="creatorInfoEnabled ? '请输入联系电话' : '默认使用当前账号信息'"
+        />
       </el-form-item>
       <el-form-item label="备注">
         <el-input v-model="form.remark" type="textarea" :rows="2" />
@@ -175,6 +216,13 @@
             {{ detailOrder.weight }} kg / {{ detailOrder.volume || 0 }} m³
           </el-descriptions-item>
           <el-descriptions-item label="备注" :span="2">{{ detailOrder.remark || '--' }}</el-descriptions-item>
+          <el-descriptions-item label="创建人">
+            <span v-if="detailCreator">
+              {{ detailCreator.realName || detailCreator.username }}
+              <el-text type="info" size="small" style="margin-left:6px">{{ detailCreator.phone || '' }}</el-text>
+            </span>
+            <span v-else class="orders-view__creator-loading">--</span>
+          </el-descriptions-item>
           <el-descriptions-item label="创建时间">{{ formatTime(detailOrder.createdAt) }}</el-descriptions-item>
           <el-descriptions-item label="更新时间">{{ formatTime(detailOrder.updatedAt) }}</el-descriptions-item>
         </el-descriptions>
@@ -201,9 +249,14 @@ import { Plus, Search, Refresh } from '@element-plus/icons-vue'
 import type { FormInstance } from 'element-plus'
 import OrderChatPanel from '@/components/OrderChatPanel.vue'
 import { orderApi, type Order } from '@/api/order'
+import { userApi, type UserBrief } from '@/api/user'
+import { useAuthStore } from '@/stores/auth'
 import { useGeocode } from '@/composables/useGeocode'
+import { useChatUnreadStore } from '@/stores/chatUnread'
 
 const { geocode, geocoding } = useGeocode()
+const chatUnread = useChatUnreadStore()
+const authStore = useAuthStore()
 
 // ---- 状态映射 ----
 const statusOptions = [
@@ -219,7 +272,7 @@ const statusOptions = [
 const STATUS_TRANSITIONS: Record<string, string[]> = {
   pending_review: ['pending', 'cancelled'],
   pending:     ['dispatched', 'cancelled'],
-  dispatched:  ['in_progress', 'cancelled', 'pending'],
+  dispatched:  ['in_progress', 'cancelled'],
   in_progress: ['completed', 'exception'],
   exception:   ['pending', 'cancelled'],
 }
@@ -271,6 +324,7 @@ async function loadData() {
     const res = await orderApi.list(params)
     tableData.value = res.data.records
     total.value = res.data.total
+    chatUnread.fetchCounts(tableData.value.map(o => o.id))
   } finally {
     loading.value = false
   }
@@ -309,6 +363,7 @@ const formRef = ref<FormInstance>()
 const detailVisible = ref(false)
 const detailLoading = ref(false)
 const detailOrder = ref<Order | null>(null)
+const detailCreator = ref<UserBrief | null>(null)
 
 const form = reactive({
   receiverName: '',
@@ -320,11 +375,30 @@ const form = reactive({
   weight: 1,
   volume: 0,
   remark: '',
+  creatorName: '',
+  creatorPhone: '',
 })
+
+const creatorInfoEnabled = ref(false)
+
+function enableCreatorInfo() {
+  creatorInfoEnabled.value = true
+  form.creatorName = authStore.userInfo.realName || authStore.userInfo.username
+  form.creatorPhone = authStore.userInfo.phone
+}
+
+function clearCreatorInfo() {
+  creatorInfoEnabled.value = false
+  form.creatorName = ''
+  form.creatorPhone = ''
+}
 
 const formRules = {
   receiverName:    [{ required: true, message: '请输入收货人姓名', trigger: 'blur' }],
-  receiverPhone:   [{ required: true, message: '请输入联系电话',   trigger: 'blur' }],
+  receiverPhone:   [
+    { required: true, message: '请输入联系电话', trigger: 'blur' },
+    { pattern: /^\d{10}$/, message: '电话号码必须为10位数字', trigger: 'blur' },
+  ],
   receiverAddress: [{ required: true, message: '请输入收货地址',   trigger: 'blur' }],
   receiverLng:     [{ required: true, type: 'number' as const, min: 0.000001, message: '请输入有效收货经度', trigger: 'blur' }],
   receiverLat:     [{ required: true, type: 'number' as const, min: 0.000001, message: '请输入有效收货纬度', trigger: 'blur' }],
@@ -346,8 +420,17 @@ async function openDetail(row: Order) {
   detailVisible.value = true
   detailLoading.value = true
   detailOrder.value = null
+  detailCreator.value = null
   try {
     detailOrder.value = await fetchOrder(row.id)
+    if (detailOrder.value?.creatorId) {
+      try {
+        const res = await userApi.getBrief(detailOrder.value.creatorId)
+        detailCreator.value = res.data
+      } catch {
+        // 获取创建人信息失败时静默处理
+      }
+    }
   } finally {
     detailLoading.value = false
   }
@@ -355,6 +438,7 @@ async function openDetail(row: Order) {
 
 function openEdit(row: Order) {
   editingId.value = row.id
+  creatorInfoEnabled.value = !!(row.senderName && row.senderName !== '广工仓储中心')
   Object.assign(form, {
     receiverName: row.receiverName,
     receiverPhone: row.receiverPhone,
@@ -365,13 +449,16 @@ function openEdit(row: Order) {
     weight: row.weight,
     volume: row.volume,
     remark: row.remark,
+    creatorName: (row.senderName && row.senderName !== '广工仓储中心') ? row.senderName : '',
+    creatorPhone: (row.senderPhone && row.senderPhone !== '02039322000') ? row.senderPhone : '',
   })
   formVisible.value = true
 }
 
 function resetForm() {
   formRef.value?.resetFields()
-  Object.assign(form, { receiverName: '', receiverPhone: '', receiverAddress: '', receiverLng: 0, receiverLat: 0, goodsName: '', weight: 1, volume: 0, remark: '' })
+  creatorInfoEnabled.value = false
+  Object.assign(form, { receiverName: '', receiverPhone: '', receiverAddress: '', receiverLng: 0, receiverLat: 0, goodsName: '', weight: 1, volume: 0, remark: '', creatorName: '', creatorPhone: '' })
 }
 
 async function handleGeocode() {
@@ -396,8 +483,8 @@ async function handleSubmit() {
   try {
     const payload = {
       ...form,
-      senderName: '广工仓储中心',
-      senderPhone: '02039322000',
+      senderName: form.creatorName || '广工仓储中心',
+      senderPhone: form.creatorPhone || '02039322000',
       senderAddress: '广东工业大学大学城校区仓库',
       senderLng: 113.396,
       senderLat: 23.0452,
@@ -486,9 +573,14 @@ async function handleStatusChange() {
 </script>
 
 <style scoped>
-.orders-view__panel {
-  overflow: hidden;
+.orders-view__chat-badge :deep(.el-badge__content) {
+  font-size: 10px;
+  height: 16px;
+  line-height: 16px;
+  min-width: 16px;
+  padding: 0 4px;
 }
+
 
 .orders-view__header {
   display: flex;

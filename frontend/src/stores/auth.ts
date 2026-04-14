@@ -35,6 +35,7 @@ export const useAuthStore = defineStore('auth', () => {
     userId: Number(sessionStorage.getItem('userId') || 0),
     username: sessionStorage.getItem('username') || '',
     realName: sessionStorage.getItem('realName') || '',
+    phone: sessionStorage.getItem('phone') || '',
     role: sessionStorage.getItem('role') || '',
   })
 
@@ -48,6 +49,7 @@ export const useAuthStore = defineStore('auth', () => {
       userId: info.userId,
       username: info.username,
       realName: info.realName,
+      phone: info.phone || '',
       role: info.role,
     }
     sessionStorage.setItem('accessToken', info.accessToken)
@@ -55,6 +57,7 @@ export const useAuthStore = defineStore('auth', () => {
     sessionStorage.setItem('userId', String(info.userId))
     sessionStorage.setItem('username', info.username)
     sessionStorage.setItem('realName', info.realName)
+    sessionStorage.setItem('phone', info.phone || '')
     sessionStorage.setItem('role', info.role)
 
     // 按角色跳转
@@ -63,7 +66,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   function logout() {
     accessToken.value = ''
-    userInfo.value = { userId: 0, username: '', realName: '', role: '' }
+    userInfo.value = { userId: 0, username: '', realName: '', phone: '', role: '' }
     sessionStorage.clear()
     router.push('/login')
   }

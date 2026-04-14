@@ -62,6 +62,7 @@ public class AuthServiceImpl implements AuthService {
                 .userId(user.getId())
                 .username(user.getUsername())
                 .realName(user.getRealName())
+                .phone(user.getPhone())
                 .role(user.getRole())
                 .build();
     }
@@ -111,6 +112,7 @@ public class AuthServiceImpl implements AuthService {
                 .userId(userId)
                 .username(user.getUsername())
                 .realName(user.getRealName())
+                .phone(user.getPhone())
                 .role(user.getRole())
                 .build();
     }
