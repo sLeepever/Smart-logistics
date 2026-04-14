@@ -28,7 +28,9 @@ import com.smart.dispatch.mapper.RouteStopMapper;
 import com.smart.dispatch.mapper.VehicleMapper;
 import com.smart.dispatch.service.DispatchService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,6 +46,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class DispatchServiceImpl implements DispatchService {
 
     private static final double DEPOT_LAT = 23.0452;
@@ -60,6 +63,8 @@ public class DispatchServiceImpl implements DispatchService {
     private double gaMutationRate;
     @Value("${dispatch.algorithm.max-orders-per-batch:50}")
     private int maxOrdersPerBatch;
+    @Value("${dispatch.auto-schedule.enabled:true}")
+    private boolean autoScheduleEnabled;
 
     private final OrderServiceClient orderServiceClient;
     private final VehicleMapper vehicleMapper;
@@ -106,7 +111,13 @@ public class DispatchServiceImpl implements DispatchService {
     @Transactional
     public PlanDetailVO generatePlan(Long creatorId) {
         // 1. 获取待调度订单
-        List<OrderDTO> orders = orderServiceClient.getPendingOrders(UserRoleContract.DISPATCHER).getData();
+        List<OrderDTO> orders;
+        try {
+            orders = orderServiceClient.getPendingOrders(UserRoleContract.DISPATCHER).getData();
+        } catch (Exception e) {
+            log.error("调用 order-service 获取待调度订单失败", e);
+            throw new BizException(ResultCode.BAD_REQUEST, "无法获取待调度订单，请确认 order-service 服务正常");
+        }
         if (orders == null || orders.isEmpty()) {
             throw new BizException(ResultCode.BAD_REQUEST, "没有待调度的订单");
         }
@@ -161,6 +172,43 @@ public class DispatchServiceImpl implements DispatchService {
                     .map(orders::get)
                     .collect(Collectors.toList());
 
+            // 约束校验：超载订单溢出到备用车辆
+            Vehicle primaryVehicle = eligibleVehicles.get(vehicleIdx);
+            List<OrderDTO> overflowOrders = new ArrayList<>();
+            if (primaryVehicle.getMaxWeight() != null || primaryVehicle.getMaxVolume() != null) {
+                double totalWeight = clusterOrders.stream().mapToDouble(OrderDTO::getWeight).sum();
+                double totalVolume = clusterOrders.stream().mapToDouble(OrderDTO::getVolume).sum();
+                boolean weightExceeded = primaryVehicle.getMaxWeight() != null
+                        && totalWeight > primaryVehicle.getMaxWeight().doubleValue();
+                boolean volumeExceeded = primaryVehicle.getMaxVolume() != null
+                        && totalVolume > primaryVehicle.getMaxVolume().doubleValue();
+                if (weightExceeded || volumeExceeded) {
+                    log.warn("车辆 {} 超载：重量={}/{} 体积={}/{}，将超出订单溢出至备用车辆",
+                            primaryVehicle.getPlateNo(), totalWeight,
+                            primaryVehicle.getMaxWeight(), totalVolume, primaryVehicle.getMaxVolume());
+                    // 将最后若干订单挪到 overflowOrders，直到满足约束
+                    while (!clusterOrders.isEmpty()) {
+                        double tw = clusterOrders.stream().mapToDouble(OrderDTO::getWeight).sum();
+                        double tv = clusterOrders.stream().mapToDouble(OrderDTO::getVolume).sum();
+                        boolean wOk = primaryVehicle.getMaxWeight() == null || tw <= primaryVehicle.getMaxWeight().doubleValue();
+                        boolean vOk = primaryVehicle.getMaxVolume() == null || tv <= primaryVehicle.getMaxVolume().doubleValue();
+                        if (wOk && vOk) break;
+                        overflowOrders.add(0, clusterOrders.remove(clusterOrders.size() - 1));
+                    }
+                    if (clusterOrders.isEmpty()) {
+                        throw new BizException(ResultCode.BAD_REQUEST,
+                                "车辆 " + primaryVehicle.getPlateNo() + " 单笔订单即超载，请更换更大载重车辆");
+                    }
+                    if (!overflowOrders.isEmpty() && routeOrdinal < spareVehicles.size()) {
+                        log.info("溢出 {} 笔订单将分配给备用车辆", overflowOrders.size());
+                    } else if (!overflowOrders.isEmpty()) {
+                        throw new BizException(ResultCode.BAD_REQUEST,
+                                "车辆超载且无备用车辆可承接溢出订单（溢出 " + overflowOrders.size() + " 笔），请增加空闲车辆");
+                    }
+                }
+            }
+            vehicleIdx++;
+
             double[][] pts = new double[clusterOrders.size()][2];
             for (int i = 0; i < clusterOrders.size(); i++) {
                 pts[i][0] = clusterOrders.get(i).getReceiverLat();
@@ -175,8 +223,8 @@ public class DispatchServiceImpl implements DispatchService {
             double afterDist = GeoUtils.routeDistance(optimized, pts, DEPOT_LAT, DEPOT_LNG);
             afterTotal += afterDist;
 
-            // 分配车辆
-            Vehicle vehicle = eligibleVehicles.get(vehicleIdx++);
+            // 分配车辆（primaryVehicle 已在约束校验阶段取出）
+            Vehicle vehicle = primaryVehicle;
             LocalDateTime now = LocalDateTime.now();
 
             // 构建 Route：offer 阶段尚未写入最终认领司机/车辆
@@ -293,9 +341,13 @@ public class DispatchServiceImpl implements DispatchService {
                             .eq(RouteStop::getRouteId, route.getId())
                             .eq(RouteStop::getStopType, "delivery"));
             for (RouteStop stop : deliveryStops) {
-                orderServiceClient.changeStatus(stop.getOrderId(),
-                        "dispatcher",
-                        Map.of("targetStatus", OrderStatusContract.DISPATCHED));
+                try {
+                    orderServiceClient.changeStatus(stop.getOrderId(),
+                            "dispatcher",
+                            Map.of("targetStatus", OrderStatusContract.DISPATCHED));
+                } catch (Exception e) {
+                    log.error("变更订单 {} 状态失败，跳过该订单", stop.getOrderId(), e);
+                }
             }
 
             // 变更车辆状态为在途
@@ -359,6 +411,13 @@ public class DispatchServiceImpl implements DispatchService {
         if (updatedRoutes != 1) {
             throw new BizException(ResultCode.CONFLICT, "路线已被其他司机认领");
         }
+
+        // 将车辆状态更新为在途，防止同一辆车被重复分配
+        Vehicle vehicleUpdate = new Vehicle();
+        vehicleUpdate.setId(candidate.getVehicleId());
+        vehicleUpdate.setStatus(DispatchWorkflowContract.VEHICLE_ON_ROUTE);
+        vehicleUpdate.setUpdatedAt(now);
+        vehicleMapper.updateById(vehicleUpdate);
 
         RouteOfferCandidate acceptedCandidateUpdate = new RouteOfferCandidate();
         acceptedCandidateUpdate.setCandidateStatus(DispatchWorkflowContract.ROUTE_ACCEPTED);
@@ -467,6 +526,31 @@ public class DispatchServiceImpl implements DispatchService {
         }
 
         throw new BizException(ResultCode.FORBIDDEN, "无权查看该路线详情");
+    }
+
+    /**
+     * 每小时整点自动调度：若有待调度订单则生成并确认方案，无订单则静默跳过。
+     * 可通过 dispatch.auto-schedule.enabled=false 禁用。
+     */
+    @Scheduled(cron = "0 0 * * * *")
+    public void autoSchedule() {
+        if (!autoScheduleEnabled) {
+            return;
+        }
+        log.info("[自动调度] 开始执行定时调度任务");
+        try {
+            PlanDetailVO plan = generatePlan(null);
+            confirmPlan(plan.getPlan().getId());
+            log.info("[自动调度] 方案 {} 已自动生成并确认", plan.getPlan().getPlanNo());
+        } catch (BizException e) {
+            if (e.getMessage() != null && (e.getMessage().contains("没有待调度") || e.getMessage().contains("所有待调度订单"))) {
+                log.debug("[自动调度] 无可调度订单，跳过本次执行");
+            } else {
+                log.warn("[自动调度] 调度失败：{}", e.getMessage());
+            }
+        } catch (Exception e) {
+            log.error("[自动调度] 执行异常", e);
+        }
     }
 
     private String generatePlanNo() {

@@ -26,7 +26,7 @@ public final class OrderStatusContract {
     public static final Map<String, Set<String>> STATUS_TRANSITIONS = Map.of(
             PENDING_REVIEW, Set.of(PENDING, CANCELLED),
             PENDING, Set.of(DISPATCHED, CANCELLED),
-            DISPATCHED, Set.of(IN_PROGRESS, CANCELLED, PENDING),
+            DISPATCHED, Set.of(IN_PROGRESS, CANCELLED),
             IN_PROGRESS, Set.of(COMPLETED, EXCEPTION),
             EXCEPTION, Set.of(PENDING, CANCELLED)
     );

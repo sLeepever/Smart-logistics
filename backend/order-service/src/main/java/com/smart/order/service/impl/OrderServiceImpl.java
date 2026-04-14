@@ -264,23 +264,11 @@ public class OrderServiceImpl implements OrderService {
     }
 
     /**
-     * 生成订单号：ORD + yyyyMMdd + 4位序号
+     * 生成订单号：ORD + yyyyMMdd + 4位序号（使用 PostgreSQL 序列防并发竞争）
      */
     private String generateOrderNo() {
         String date = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        String prefix = "ORD" + date;
-        // 查当天最大序号
-        Order last = orderMapper.selectOne(
-                new LambdaQueryWrapper<Order>()
-                        .likeRight(Order::getOrderNo, prefix)
-                        .orderByDesc(Order::getOrderNo)
-                        .last("LIMIT 1")
-        );
-        int seq = 1;
-        if (last != null) {
-            String lastNo = last.getOrderNo();
-            seq = Integer.parseInt(lastNo.substring(prefix.length())) + 1;
-        }
-        return prefix + String.format("%04d", seq);
+        long seq = orderMapper.nextOrderNoSeq();
+        return "ORD" + date + String.format("%04d", seq % 10000 == 0 ? 10000 : seq % 10000);
     }
 }

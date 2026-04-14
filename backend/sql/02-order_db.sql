@@ -3,6 +3,9 @@
 -- 连接 order_db 后执行：psql -U postgres -d order_db -f 02-order_db.sql
 -- ============================================================
 
+-- 订单号序列（防并发竞争，代替"查最大号+1"逻辑）
+CREATE SEQUENCE IF NOT EXISTS order_no_seq START 1;
+
 CREATE TABLE IF NOT EXISTS orders (
     id               BIGSERIAL      PRIMARY KEY,
     order_no         VARCHAR(32)    NOT NULL UNIQUE,

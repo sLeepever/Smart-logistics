@@ -72,7 +72,14 @@
         </el-form>
 
         <div class="login-hint">
-          演示账号：admin / dispatcher01 / driver001 &nbsp;|&nbsp; 密码：Demo@1234
+          <button class="login-hint__toggle" @click="showDemo = !showDemo">
+            {{ showDemo ? '▲ 收起演示账号' : '▼ 查看演示账号' }}
+          </button>
+          <div v-if="showDemo" class="login-hint__accounts">
+            <div>admin / Demo@1234（管理员）</div>
+            <div>dispatcher01 / Demo@1234（调度员）</div>
+            <div>driver001 / Demo@1234（司机）</div>
+          </div>
         </div>
       </div>
     </section>
@@ -88,6 +95,7 @@ import { useAuthStore } from '@/stores/auth'
 const authStore = useAuthStore()
 const formRef = ref<FormInstance>()
 const loading = ref(false)
+const showDemo = ref(false)
 
 const form = reactive({
   username: '',
@@ -286,6 +294,28 @@ async function handleLogin() {
   font-size: 12px;
   color: var(--app-text-muted);
   line-height: 1.7;
+}
+
+.login-hint__toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-size: 12px;
+  color: var(--app-text-muted);
+  font-family: inherit;
+}
+
+.login-hint__toggle:hover {
+  color: var(--app-text-secondary);
+}
+
+.login-hint__accounts {
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid color-mix(in srgb, var(--app-border) 80%, white);
+  border-radius: var(--app-radius-sm);
 }
 
 .login-box :deep(.el-tag) {
