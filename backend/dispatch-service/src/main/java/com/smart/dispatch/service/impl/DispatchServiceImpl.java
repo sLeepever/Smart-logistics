@@ -242,10 +242,13 @@ public class DispatchServiceImpl implements DispatchService {
             List<RouteOfferCandidate> routeCandidates = new ArrayList<>();
             routeCandidates.add(buildCandidate(vehicle, DispatchWorkflowContract.ROUTE_OFFERED, now, 1));
 
-            if (routeOrdinal < spareVehicles.size()) {
-                Vehicle backupVehicle = spareVehicles.get(routeOrdinal);
-                if (!backupVehicle.getId().equals(vehicle.getId()) && backupVehicle.getDriverId() != null) {
+            // 在所有备用车辆中寻找第一个绑定了【不同司机】的车辆作为备选
+            // 必须是不同司机，否则拒绝后邀约仍归同一司机，无法流转给其他人
+            for (Vehicle backupVehicle : spareVehicles) {
+                if (backupVehicle.getDriverId() != null
+                        && !backupVehicle.getDriverId().equals(vehicle.getDriverId())) {
                     routeCandidates.add(buildCandidate(backupVehicle, DispatchWorkflowContract.ROUTE_CANDIDATE_QUEUED, null, 2));
+                    break;
                 }
             }
             candidatesToSave.add(routeCandidates);
