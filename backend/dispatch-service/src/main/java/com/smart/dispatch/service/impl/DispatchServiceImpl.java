@@ -40,8 +40,10 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -242,13 +244,15 @@ public class DispatchServiceImpl implements DispatchService {
             List<RouteOfferCandidate> routeCandidates = new ArrayList<>();
             routeCandidates.add(buildCandidate(vehicle, DispatchWorkflowContract.ROUTE_OFFERED, now, 1));
 
-            // 在所有备用车辆中寻找第一个绑定了【不同司机】的车辆作为备选
-            // 必须是不同司机，否则拒绝后邀约仍归同一司机，无法流转给其他人
+            // 将所有备用车辆中绑定了【不同司机】的车辆依次排队，displayOrder 从 2 递增
+            // 每个不同 driverId 只取第一辆车，避免同一司机重复入队
+            int displayOrder = 2;
+            Set<Long> queuedDriverIds = new HashSet<>();
+            queuedDriverIds.add(vehicle.getDriverId()); // 排除主候选司机
             for (Vehicle backupVehicle : spareVehicles) {
                 if (backupVehicle.getDriverId() != null
-                        && !backupVehicle.getDriverId().equals(vehicle.getDriverId())) {
-                    routeCandidates.add(buildCandidate(backupVehicle, DispatchWorkflowContract.ROUTE_CANDIDATE_QUEUED, null, 2));
-                    break;
+                        && queuedDriverIds.add(backupVehicle.getDriverId())) {
+                    routeCandidates.add(buildCandidate(backupVehicle, DispatchWorkflowContract.ROUTE_CANDIDATE_QUEUED, null, displayOrder++));
                 }
             }
             candidatesToSave.add(routeCandidates);
