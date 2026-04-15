@@ -88,6 +88,7 @@ import {
   type OrderChatMessage,
   type OrderChatWsEvent,
 } from '@/api/chat'
+import { useChatUnreadStore } from '@/stores/chatUnread'
 
 const props = withDefaults(defineProps<{
   orderId: number
@@ -100,6 +101,7 @@ const props = withDefaults(defineProps<{
 
 const currentUserId = Number(sessionStorage.getItem('userId') || 0)
 const currentRole = sessionStorage.getItem('role') || ''
+const chatUnreadStore = useChatUnreadStore()
 
 const messages = ref<OrderChatMessage[]>([])
 const draft = ref('')
@@ -125,7 +127,7 @@ const connectionTagType = computed<'' | 'success' | 'warning' | 'info'>(() => {
   return 'info'
 })
 
-const wsReady = computed(() => ws?.readyState === WebSocket.OPEN)
+const wsReady = computed(() => connectionState.value === 'connected')
 
 let ws: WebSocket | null = null
 let reconnectTimer: ReturnType<typeof window.setTimeout> | null = null
@@ -149,6 +151,7 @@ async function bootstrap(orderId: number) {
   teardown(true)
   activeOrderId = orderId
   resetMessages()
+  chatUnreadStore.clearCount(orderId)
   await loadHistory(orderId)
   connectSocket(orderId)
 }
