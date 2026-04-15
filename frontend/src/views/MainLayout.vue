@@ -39,7 +39,7 @@
           </el-menu-item>
         </el-menu>
 
-        <div class="app-aside__footer">
+        <div v-if="currentRole !== 'customer'" class="app-aside__footer">
           <span class="app-aside__footer-label">今日关注</span>
           <strong>订单、车辆与运输进度</strong>
         </div>
