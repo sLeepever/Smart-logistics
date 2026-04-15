@@ -433,13 +433,13 @@ const formRules: FormRules = {
   senderName: [{ required: true, message: '请输入寄件人姓名', trigger: 'blur' }],
   senderPhone: [
     { required: true, message: '请输入寄件电话', trigger: 'blur' },
-    { pattern: /^\d{10}$/, message: '电话号码必须为10位数字', trigger: 'blur' },
+    { pattern: /^\d{11}$/, message: '请输入正确的电话号码', trigger: 'blur' },
   ],
   senderAddress: [{ required: true, message: '请输入寄件地址', trigger: 'blur' }],
   receiverName: [{ required: true, message: '请输入收货人姓名', trigger: 'blur' }],
   receiverPhone: [
     { required: true, message: '请输入收货电话', trigger: 'blur' },
-    { pattern: /^\d{10}$/, message: '电话号码必须为10位数字', trigger: 'blur' },
+    { pattern: /^\d{11}$/, message: '请输入正确的电话号码', trigger: 'blur' },
   ],
   receiverAddress: [{ required: true, message: '请输入收货地址', trigger: 'blur' }],
   receiverLng: [{ required: true, type: 'number' as const, min: 0.000001, message: '请输入有效收货经度', trigger: 'blur' }],

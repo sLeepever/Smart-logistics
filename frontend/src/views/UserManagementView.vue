@@ -629,9 +629,9 @@ function validatePhone(_: unknown, value: string, callback: (error?: Error) => v
     callback()
     return
   }
-  const phonePattern = /^1[3-9]\d{9}$/
+  const phonePattern = /^\d{11}$/
   if (!phonePattern.test(value.trim())) {
-    callback(new Error('手机号格式不正确'))
+    callback(new Error('请输入正确的电话号码'))
     return
   }
   callback()
