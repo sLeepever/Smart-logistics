@@ -55,6 +55,7 @@
         border
         stripe
         class="user-management__table"
+        :row-class-name="({ row }) => row.status === 0 ? 'user-management__row--disabled' : ''"
         data-testid="user-table"
       >
         <el-table-column prop="username" label="用户名" min-width="120" />
@@ -121,6 +122,17 @@
               <template #reference>
                 <el-button link type="warning" size="small" :data-testid="`user-disable-${row.id}`">
                   禁用
+                </el-button>
+              </template>
+            </el-popconfirm>
+            <el-popconfirm
+              v-if="row.status === 0 && !isCurrentUser(row)"
+              title="确认启用该用户？"
+              @confirm="handleEnable(row)"
+            >
+              <template #reference>
+                <el-button link type="success" size="small" :data-testid="`user-enable-${row.id}`">
+                  启用
                 </el-button>
               </template>
             </el-popconfirm>
@@ -513,6 +525,13 @@ async function handleDisable(row: User) {
   await loadData()
 }
 
+async function handleEnable(row: User) {
+  const res = await userApi.getById(row.id)
+  await userApi.update(row.id, buildPayloadFromUser(res.data, { status: 1 }))
+  ElMessage.success('用户已启用')
+  await loadData()
+}
+
 async function handleDelete(row: User) {
   await userApi.delete(row.id)
   ElMessage.success('用户已删除')
@@ -695,6 +714,16 @@ onMounted(loadData)
 
 .user-management__table {
   width: 100%;
+}
+
+/* 禁用用户行整行灰显 */
+.user-management :deep(.user-management__row--disabled) {
+  color: var(--app-text-muted);
+  opacity: 0.6;
+}
+
+.user-management :deep(.user-management__row--disabled td) {
+  background-color: color-mix(in srgb, var(--app-surface-muted) 60%, white) !important;
 }
 
 .user-management__pagination {
