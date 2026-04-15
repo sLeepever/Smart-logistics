@@ -107,6 +107,7 @@ const wsConnected = ref(false)
 
 let map: L.Map | null = null
 let ws: WebSocket | null = null
+let pollTimer: ReturnType<typeof setInterval> | null = null
 const markers = new Map<number, L.Marker>()
 const trackLines = new Map<number, L.Polyline>()
 
@@ -262,11 +263,14 @@ onMounted(async () => {
   initMap()
   await loadLive()
   connectWS()
+  // 每 15 秒轮询一次，兜底 WebSocket 断连或首次加载无数据的情况
+  pollTimer = setInterval(loadLive, 15000)
 })
 
 onUnmounted(() => {
   ws?.close()
   map?.remove()
+  if (pollTimer) clearInterval(pollTimer)
 })
 </script>
 

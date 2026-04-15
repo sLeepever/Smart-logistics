@@ -286,7 +286,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import OrderChatPanel from '@/components/OrderChatPanel.vue'
 import {
@@ -326,12 +326,15 @@ function retryLocation() {
 
 async function reportLocationNow() {
   if (!currentPosition.value || locationStatus.value !== 'granted') return
-  const inProgressRoute = routeTasks.value.find(t => t.route.status === 'in_progress')
-  if (!inProgressRoute) return
+  // accepted 或 in_progress 的路线都上报，让调度员能看到接单司机的实时位置
+  const activeRoute = routeTasks.value.find(
+    t => t.route.status === 'in_progress' || t.route.status === 'accepted',
+  )
+  if (!activeRoute) return
 
   try {
     await trackingApi.reportLocation({
-      routeId: inProgressRoute.route.id,
+      routeId: activeRoute.route.id,
       lat: currentPosition.value.lat,
       lng: currentPosition.value.lng,
       speed: currentPosition.value.speed ?? undefined,
@@ -344,6 +347,13 @@ async function reportLocationNow() {
     // 静默失败，下次定时器重试
   }
 }
+
+// 首次获取到 GPS 后立即上报，无需等待 30 秒计时器
+watch(currentPosition, (newPos, oldPos) => {
+  if (newPos && !oldPos) {
+    reportLocationNow()
+  }
+})
 
 const routeTasks = ref<DriverRouteTask[]>([])
 const routeLoading = ref(false)
