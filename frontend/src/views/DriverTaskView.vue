@@ -12,6 +12,33 @@
         </div>
       </template>
 
+      <!-- 实时位置状态卡片 -->
+      <div class="location-bar" :class="`location-bar--${locationStatus}`">
+        <div class="location-bar__left">
+          <span class="location-bar__dot" />
+          <span class="location-bar__label">{{ locationLabel }}</span>
+          <span v-if="currentPosition" class="location-bar__coords">
+            {{ currentPosition.lat.toFixed(5) }}, {{ currentPosition.lng.toFixed(5) }}
+            <span v-if="currentPosition.accuracy" class="location-bar__accuracy">
+              精度 ±{{ Math.round(currentPosition.accuracy) }}m
+            </span>
+          </span>
+        </div>
+        <div class="location-bar__right">
+          <span v-if="lastReportTime" class="location-bar__report">
+            已上报 {{ lastReportTime }}
+          </span>
+          <el-button
+            v-if="locationStatus === 'denied' || locationStatus === 'unavailable'"
+            size="small"
+            text
+            @click="retryLocation"
+          >
+            重试定位
+          </el-button>
+        </div>
+      </div>
+
       <div class="summary-grid">
         <section class="summary-card summary-card--offer">
           <span class="summary-card__label">待响应邀约</span>
@@ -224,7 +251,14 @@
                     >
                       <div class="route-chat-card__meta">
                         <div>
-                          <strong>订单 #{{ stop.orderId }}</strong>
+                          <el-badge
+                            :value="chatUnread.getCount(stop.orderId)"
+                            :max="99"
+                            :hidden="chatUnread.getCount(stop.orderId) === 0"
+                            class="driver-task__chat-badge"
+                          >
+                            <strong>订单 #{{ stop.orderId }}</strong>
+                          </el-badge>
                           <p>{{ stop.address }}</p>
                         </div>
                         <el-tag size="small" effect="plain">第 {{ stop.stopSeq }} 站</el-tag>
@@ -252,7 +286,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import OrderChatPanel from '@/components/OrderChatPanel.vue'
 import {
@@ -262,7 +296,54 @@ import {
   type DriverRouteTask,
   type RouteDetail,
 } from '@/api/dispatch'
+import { trackingApi } from '@/api/tracking'
 import { useDriverOffers } from '@/composables/useDriverOffers'
+import { useDriverLocation } from '@/composables/useDriverLocation'
+import { useChatUnreadStore } from '@/stores/chatUnread'
+
+const chatUnread = useChatUnreadStore()
+
+// ---- 实时定位 ----
+const { position: currentPosition, status: locationStatus, start: startLocation, stop: stopLocation } = useDriverLocation()
+const lastReportTime = ref('')
+let reportTimer: ReturnType<typeof setInterval> | null = null
+
+const locationLabel = computed(() => {
+  const map: Record<string, string> = {
+    idle:        '定位未启动',
+    requesting:  '正在获取位置...',
+    granted:     '位置已获取',
+    denied:      '位置权限被拒绝',
+    unavailable: '无法获取位置',
+  }
+  return map[locationStatus.value] ?? '定位中'
+})
+
+function retryLocation() {
+  stopLocation()
+  startLocation()
+}
+
+async function reportLocationNow() {
+  if (!currentPosition.value || locationStatus.value !== 'granted') return
+  const inProgressRoute = routeTasks.value.find(t => t.route.status === 'in_progress')
+  if (!inProgressRoute) return
+
+  try {
+    await trackingApi.reportLocation({
+      routeId: inProgressRoute.route.id,
+      lat: currentPosition.value.lat,
+      lng: currentPosition.value.lng,
+      speed: currentPosition.value.speed ?? undefined,
+      heading: currentPosition.value.heading ?? undefined,
+      recordedAt: new Date(currentPosition.value.timestamp).toISOString().slice(0, 19),
+    })
+    const now = new Date()
+    lastReportTime.value = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`
+  } catch {
+    // 静默失败，下次定时器重试
+  }
+}
 
 const routeTasks = ref<DriverRouteTask[]>([])
 const routeLoading = ref(false)
@@ -318,7 +399,17 @@ const routeGroups = computed(() => [
 const isRefreshing = computed(() => routeLoading.value || offersLoading.value)
 
 onMounted(() => {
+  startLocation()
   loadPageData()
+  // 每 30 秒上报一次位置
+  reportTimer = setInterval(reportLocationNow, 30000)
+})
+
+onUnmounted(() => {
+  if (reportTimer) {
+    clearInterval(reportTimer)
+    reportTimer = null
+  }
 })
 
 async function loadPageData() {
@@ -448,6 +539,13 @@ async function ensureRouteDetail(routeId: number, force = false) {
   try {
     const res = await dispatchApi.getRouteDetail(routeId)
     detailMap[routeId] = res.data
+    // 拉取该路线内所有送货订单的未读数
+    const orderIds = (res.data?.stops ?? [])
+      .filter(s => s.stopType === 'delivery' && s.orderId > 0)
+      .map(s => s.orderId)
+    if (orderIds.length > 0) {
+      chatUnread.fetchCounts(orderIds)
+    }
   } catch {
     ElMessage.error(`路线 #${routeId} 详情加载失败`)
   } finally {
@@ -524,6 +622,99 @@ async function handleOfferAction(type: 'accept' | 'reject', routeId: number) {
 <style scoped>
 .driver-task-view {
   color: var(--app-text-primary);
+}
+
+/* 位置状态栏 */
+.location-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--app-space-3);
+  padding: 10px 16px;
+  border-radius: var(--app-radius-md);
+  border: 1px solid color-mix(in srgb, var(--app-border) 80%, white);
+  margin-bottom: var(--app-space-4);
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+
+.location-bar--idle,
+.location-bar--requesting {
+  background: color-mix(in srgb, var(--app-surface-muted) 60%, white);
+  border-color: var(--app-border);
+}
+
+.location-bar--granted {
+  background: color-mix(in srgb, var(--el-color-success) 8%, white);
+  border-color: color-mix(in srgb, var(--el-color-success) 30%, white);
+}
+
+.location-bar--denied,
+.location-bar--unavailable {
+  background: color-mix(in srgb, var(--el-color-warning) 10%, white);
+  border-color: color-mix(in srgb, var(--el-color-warning) 30%, white);
+}
+
+.location-bar__left {
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-3);
+  flex-wrap: wrap;
+}
+
+.location-bar__right {
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-3);
+  flex-shrink: 0;
+}
+
+.location-bar__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--app-text-muted);
+}
+
+.location-bar--requesting .location-bar__dot {
+  background: var(--el-color-warning);
+  animation: pulse 1.2s infinite;
+}
+
+.location-bar--granted .location-bar__dot {
+  background: var(--el-color-success);
+}
+
+.location-bar--denied .location-bar__dot,
+.location-bar--unavailable .location-bar__dot {
+  background: var(--el-color-warning);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.location-bar__label {
+  font-weight: 600;
+  color: var(--app-text-primary);
+}
+
+.location-bar__coords {
+  color: var(--app-text-secondary);
+  font-family: var(--app-font-mono);
+  font-size: 12px;
+}
+
+.location-bar__accuracy {
+  margin-left: 6px;
+  color: var(--app-text-muted);
+}
+
+.location-bar__report {
+  color: var(--el-color-success);
+  font-size: 12px;
 }
 
 .task-shell {
@@ -818,6 +1009,14 @@ async function handleOfferAction(type: 'accept' | 'reject', routeId: number) {
 .route-chat-card__meta strong {
   color: color-mix(in srgb, var(--app-primary) 86%, white);
   font-size: 15px;
+}
+
+.driver-task__chat-badge :deep(.el-badge__content) {
+  font-size: 10px;
+  height: 16px;
+  line-height: 16px;
+  min-width: 16px;
+  padding: 0 4px;
 }
 
 .route-chat-card__meta p {

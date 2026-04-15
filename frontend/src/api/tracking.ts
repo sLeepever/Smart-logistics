@@ -14,11 +14,23 @@ export type TrackPoint = {
   lng: number | string
 }
 
+export interface LocationReportPayload {
+  routeId: number
+  lat: number
+  lng: number
+  speed?: number
+  heading?: number
+  recordedAt: string
+}
+
 export const trackingApi = {
   getLiveLocations() {
     return request.get<unknown, { data: LiveLocation[] }>('/tracking/live')
   },
   getTrack(routeId: number) {
     return request.get<unknown, { data: TrackPoint[] }>(`/tracking/routes/${routeId}/track`)
+  },
+  reportLocation(data: LocationReportPayload) {
+    return request.post('/tracking/location', data)
   },
 }
